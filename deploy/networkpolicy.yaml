@@ -1,0 +1,79 @@
+---
+# Default-deny everything in the namespace.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: vault-shim
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Allow ingress from the nginx-ingress controller namespace on the HTTP port.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-from-nginx
+  namespace: vault-shim
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: vault-shim
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# Allow egress to kube-dns for service-name resolution.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-kube-dns
+  namespace: vault-shim
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: vault-shim
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# Allow egress to the External Secrets Operator controller. This is what
+# lets the SecretStore + ExternalSecret reconcile loop refresh the synced
+# Secret on the configured interval.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-eso
+  namespace: vault-shim
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: vault-shim
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: external-secrets
+      ports:
+        - protocol: TCP
+          port: 443

@@ -1,0 +1,65 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({app=\"vault-shim\"} |= \"auth failed\" [1m]))",
+          "legendFormat": "auth failures / min",
+          "refId": "A"
+        }
+      ],
+      "title": "Failed-auth count (1m)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "targets": [
+        {
+          "expr": "sum by (actor_id) (count_over_time({app=\"vault-shim\"} |= \"secret accessed\" [5m]))",
+          "legendFormat": "{{actor_id}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Secret accesses by actor (5m)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "id": 3,
+      "targets": [
+        {
+          "expr": "{namespace=\"kube-system\", app=\"calico\"} |= \"NetworkPolicy denied\"",
+          "refId": "A"
+        }
+      ],
+      "title": "NetworkPolicy denies (kube-system audit log)",
+      "type": "logs"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["security", "vault-shim"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "vault-shim — Security events",
+  "uid": "vaultshim-sec",
+  "version": 1,
+  "weekStart": ""
+}

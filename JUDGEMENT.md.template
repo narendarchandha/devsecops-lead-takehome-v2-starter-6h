@@ -1,0 +1,88 @@
+# JUDGEMENT.md
+
+> Copy this file to `JUDGEMENT.md` and fill in. Do not delete the section headers — reviewers grade by section.
+
+---
+
+## Section 1 — AI-native working style
+
+### My AI tool stack
+
+`<which models, which IDE, which agent harnesses, any custom CLAUDE.md / cursor-rules / prompts that mattered>`
+
+### How I worked
+
+Two or three sentences on how you actually used the agents during this 6-hour exercise. Were they read-only? Did you let them propose patches? Did you reject any proposal? How did you split human-time vs agent-time?
+
+`<your answer>`
+
+---
+
+## Section 2 — Catches against the starter (≥3 required)
+
+For each catch:
+
+- **What:** one-line summary.
+- **Where:** `path/to/file:42`.
+- **Severity:** `CRITICAL` / `HIGH` / `MEDIUM` / `LOW` with one sentence on why.
+- **Agent-shape:** the specific shape of the agent (or human) failure that generated this.
+- **Which gate _should_ have caught it?** Name the wired gate that exists and didn't fire — or note "no gate exists for this class".
+- **What now prevents the regression?** A test, a config tightening, a custom rule — something concrete.
+
+### Catch 1
+
+- **What:** `<one-line>`
+- **Where:** `<file:line>`
+- **Severity:** `<CRITICAL|HIGH|MEDIUM|LOW>` — `<why>`
+- **Agent-shape:** `<the shape>`
+- **Which gate should have caught it?** `<gate name + why it didn't>`
+- **Regression prevention:** `<the test or gate change>`
+
+### Catch 2
+
+`<same shape>`
+
+### Catch 3
+
+`<same shape>`
+
+### (Optional) Catch 4+
+
+`<same shape>`
+
+---
+
+## Section 3 — Surgical fix
+
+- **Which catch:** `<catch #>`
+- **The patch:** link to the commit or paste the diff.
+- **3-line rationale:** why this fix, why this scope, what you didn't change and why.
+
+`<your answer>`
+
+---
+
+## Section 4 — Brief critique (optional)
+
+Anything about the brief, the starter, or this whole shape that you'd push back on. Empty section is fine.
+
+`<your answer>`
+
+---
+
+## Section 5 — vault-shim catch-vs-miss table (heavily scored)
+
+Per the brief, this section diffs your findings against vault-shim's 6 deliberate vuln categories. Reviewers check this against an internal catalogue. **Claiming a catch your repo doesn't show is the highest-signal red flag in the entire rubric** — be honest about misses.
+
+| # | vault-shim vuln category | Caught by your pipeline (which gate, with artefact link / line)? | Should have been caught by? | Notes / gap analysis |
+| --- | --- | --- | --- | --- |
+| 1 | CVE-class dependencies (3 of them in `go.mod`) | `<your answer>` | govulncheck (Go vuln DB) + trivy fs | `<your gap analysis>` |
+| 2 | Secret in config file (signing_key + bootstrap_token in `vault-shim/config.yaml`) | `<your answer>` | gitleaks (or trufflehog) entropy/keyword rules | `<your gap analysis>` |
+| 3 | Container misconfiguration (Dockerfile: root, no USER, single-stage, no HEALTHCHECK) | `<your answer>` | Trivy image + Kyverno PSS admission | `<your gap analysis>` |
+| 4 | Input-validation bug (`req.Key` unvalidated in `postSecret`) | `<your answer>` | Semgrep (custom rule on `r2c-security-audit`) + manual review | `<your gap analysis>` |
+| 5 | Secret value emitted in log lines (`postSecret` + `getSecret` `log.Printf`) | `<your answer>` | Custom semgrep rule for `log + sensitive-field` pattern + runtime alert | `<your gap analysis>` |
+| 6 | Missing rate-limit on write endpoint | `<your answer>` | Manual review only (no reliable static rule); STRIDE D in SECURITY.md | `<your gap analysis>` |
+
+### Summary
+
+`<one paragraph: how many caught, how many missed, which class of failure dominated, what you'd add to the pipeline first>`

@@ -1,0 +1,16 @@
+apiVersion: 1
+
+providers:
+  - name: 'take-home-dashboards'
+    orgId: 1
+    folder: 'take-home'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      # Maps to the volume mount in docker-compose.observability.yml.
+      # The candidate adds dashboard JSONs to ../../dashboards/ (i.e.
+      # observability/dashboards/) and they auto-load here.
+      path: /etc/grafana/dashboards
+      foldersFromFilesStructure: true

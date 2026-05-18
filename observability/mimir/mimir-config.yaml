@@ -1,0 +1,60 @@
+# Minimal single-binary Mimir config for local take-home use.
+# Filesystem storage. Single tenant ("anonymous"). No replication.
+
+target: all,alertmanager,overrides-exporter
+
+multitenancy_enabled: false
+
+common:
+  storage:
+    backend: filesystem
+    filesystem:
+      dir: /data/common
+
+server:
+  http_listen_port: 9009
+  grpc_listen_port: 9095
+  log_level: warn
+
+ingester:
+  ring:
+    replication_factor: 1
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: memberlist
+
+blocks_storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/blocks
+  bucket_store:
+    sync_dir: /data/tsdb-sync
+  tsdb:
+    dir: /data/tsdb
+
+compactor:
+  data_dir: /data/compactor
+  sharding_ring:
+    kvstore:
+      store: memberlist
+
+store_gateway:
+  sharding_ring:
+    replication_factor: 1
+
+ruler:
+  rule_path: /data/ruler
+  ring:
+    kvstore:
+      store: memberlist
+
+alertmanager:
+  data_dir: /data/alertmanager
+  sharding_ring:
+    replication_factor: 1
+
+memberlist:
+  bind_port: 7946
+
+usage_stats:
+  enabled: false

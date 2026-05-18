@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: vault-shim
+
+resources:
+  - namespace.yaml
+  - serviceaccount.yaml
+  - externalsecret.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+  - networkpolicy.yaml
+  - pdb-hpa.yaml
+
+# Kyverno cluster-scoped policies — apply once per cluster, not per
+# namespace deploy. The Makefile's `make deploy` target applies them
+# separately from the namespaced kustomization.

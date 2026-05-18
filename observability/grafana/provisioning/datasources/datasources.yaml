@@ -1,0 +1,64 @@
+apiVersion: 1
+
+datasources:
+
+  # --- Loki ---
+  - name: Loki
+    type: loki
+    uid: loki
+    access: proxy
+    url: http://loki:3100
+    isDefault: false
+    jsonData:
+      maxLines: 1000
+      # *** CONTRACT FIELD NAME — see observability/README.md ***
+      # When a log line contains the JSON key "trace_id" with a hex string value,
+      # this derived field renders a clickable link that opens the trace in Tempo.
+      # The candidate's service MUST emit the trace_id under the exact key `trace_id`.
+      derivedFields:
+        - datasourceUid: tempo
+          matcherRegex: '"trace_id"\s*:\s*"([a-f0-9]+)"'
+          name: trace_id
+          url: '$${__value.raw}'
+          urlDisplayLabel: 'View trace'
+
+  # --- Tempo ---
+  - name: Tempo
+    type: tempo
+    uid: tempo
+    access: proxy
+    url: http://tempo:3200
+    isDefault: false
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: '-1h'
+        spanEndTimeShift: '1h'
+        tags:
+          - key: service.name
+            value: service_name
+        filterByTraceID: true
+        filterBySpanID: false
+      tracesToMetrics:
+        datasourceUid: mimir
+        tags:
+          - key: service.name
+            value: service
+      serviceMap:
+        datasourceUid: mimir
+      nodeGraph:
+        enabled: true
+
+  # --- Mimir (Prometheus-compatible) ---
+  - name: Mimir
+    type: prometheus
+    uid: mimir
+    access: proxy
+    url: http://mimir:9009/prometheus
+    isDefault: true
+    jsonData:
+      timeInterval: '15s'
+      httpMethod: 'POST'
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: tempo

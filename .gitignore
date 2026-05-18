@@ -1,0 +1,13 @@
+.DS_Store
+vault-shim/vault-shim
+vault-shim/__debug_bin
+*.sarif
+*.cdx.json
+*.tfstate
+*.tfstate.*
+.terraform/
+cover.out
+govulncheck.json
+results.sarif
+results_sarif.sarif
+cosign-attestation.txt

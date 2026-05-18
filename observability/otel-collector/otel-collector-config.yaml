@@ -1,0 +1,74 @@
+# OpenTelemetry Collector config — receives OTLP from your service and fans out:
+#   - traces  → Tempo (via OTLP gRPC on tempo:4320)
+#   - metrics → Mimir (via Prometheus remote_write on mimir:9009)
+#   - logs    → (optionally Loki via loki exporter — not enabled here; Promtail
+#               handles container-log shipping. If you want app-emitted OTLP
+#               logs to land in Loki, enable the `loki` exporter and add it to
+#               the logs pipeline.)
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 1024
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+    spike_limit_mib: 64
+
+exporters:
+  # Traces → Tempo
+  otlp/tempo:
+    endpoint: tempo:4320
+    tls:
+      insecure: true
+
+  # Metrics → Mimir (Prometheus remote_write)
+  prometheusremotewrite:
+    endpoint: http://mimir:9009/api/v1/push
+    tls:
+      insecure: true
+    resource_to_telemetry_conversion:
+      enabled: true
+
+  # Optional debug: log to stdout
+  debug:
+    verbosity: basic
+
+service:
+  telemetry:
+    logs:
+      level: warn
+    metrics:
+      level: detailed
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8889
+
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/tempo]
+
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheusremotewrite]
+
+    # Add a logs pipeline if your service emits OTLP logs (most don't —
+    # stdout JSON shipped by Promtail is the more common pattern).
+    # logs:
+    #   receivers: [otlp]
+    #   processors: [memory_limiter, batch]
+    #   exporters: [loki]

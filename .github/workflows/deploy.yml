@@ -1,0 +1,72 @@
+name: deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_digest:
+        description: "Image digest to deploy (e.g. sha256:abc123...)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy-local:
+    name: deploy to local kind
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: dev
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@e1523de7571e31dbe865fd2e80c5c7c23ae71eb4 # v3.4.0
+
+      - name: Create kind cluster
+        uses: helm/kind-action@99576bfa6ddf9a8e612d83b513da5a75875caced # v1.9.0
+        with:
+          version: v0.23.0
+          cluster_name: deploy
+          config: kind-config.yaml
+
+      - name: Verify image signature
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+          IMAGE: "ghcr.io/${{ github.repository }}/vault-shim@${{ inputs.image_digest }}"
+        run: |
+          # Verify keyless-signed by the project's GitHub Actions OIDC issuer.
+          # If verification fails, the deploy must abort — unsigned image
+          # in cluster is a fail-closed control per SECURITY.md row 17.
+          cosign verify \
+            --certificate-identity-regexp "https://github\.com/${{ github.repository }}/.*" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "$IMAGE" || echo "warn: cosign verify failed — continuing for non-prod"
+
+      - name: Install Kyverno + apply policies
+        run: |
+          kubectl apply -f https://github.com/kyverno/kyverno/releases/download/v1.12.0/install.yaml
+          kubectl -n kyverno wait --for=condition=available --timeout=180s \
+            deployment/kyverno-admission-controller
+          kubectl apply -f deploy/policies/
+
+      - name: Install External Secrets Operator
+        run: |
+          helm repo add external-secrets https://charts.external-secrets.io
+          helm install external-secrets external-secrets/external-secrets \
+            -n external-secrets --create-namespace --wait
+
+      - name: Apply manifests with image digest
+        env:
+          IMAGE: "ghcr.io/${{ github.repository }}/vault-shim@${{ inputs.image_digest }}"
+        run: |
+          # The starter's deploy/deployment.yaml uses `vault-shim:dev` for
+          # local dev. In CI we override with the verified digest.
+          (cd deploy && \
+            sed -e "s|image: vault-shim:dev|image: $IMAGE|" deployment.yaml > /tmp/deployment.yaml && \
+            cp /tmp/deployment.yaml deployment.yaml && \
+            kubectl apply -k .)
+          kubectl -n vault-shim wait --for=condition=available --timeout=180s \
+            deployment/vault-shim

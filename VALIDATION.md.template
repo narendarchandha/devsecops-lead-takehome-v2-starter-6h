@@ -1,0 +1,146 @@
+# VALIDATION.md
+
+> Copy this file to `VALIDATION.md` and fill in. **Commit this file BEFORE patching anything in `deploy/`, `vault-shim/`, `.github/`, or `observability/`.** Reviewers check the commit order via `git log --follow VALIDATION.md`.
+
+---
+
+## Bring-up
+
+### `make observability-up`
+
+```text
+<paste docker compose output; confirm Loki/Tempo/Mimir/Grafana/Promtail/OTel started healthy>
+```
+
+### `make cluster-up`
+
+```text
+<paste; confirm kind cluster created + ingress-nginx + Kyverno + ESO installed>
+```
+
+### `make deploy`
+
+```text
+<paste; confirm vault-shim Deployment Available, Pod Ready, Ingress reachable>
+```
+
+### Request smoke test
+
+```text
+<paste curl outputs for /healthz, /readyz, and one /v1/secrets call>
+```
+
+---
+
+## LGTM end-to-end trace
+
+This is the validation that proves observability actually works. The system either has data flowing or it doesn't.
+
+### Grafana — RED dashboard for vault-shim
+
+`<paste screenshot path OR pasted panel JSON snippet showing request rate, 5xx ratio, p95 latency populating>`
+
+### Loki — pick one request, find its log lines
+
+```text
+logcli query '{app="vault-shim"} |= "request_id=req-..."' --limit 10
+<paste>
+```
+
+### Tempo — pick the trace_id from that log, get the span tree
+
+```text
+<paste the trace details from Grafana Explore -> Tempo, OR the raw query result>
+```
+
+### Mimir — confirm `http_server_request_duration_seconds_count` metric populating
+
+```text
+<paste output of: curl 'http://localhost:9009/prometheus/api/v1/query?query=http_server_request_duration_seconds_count{service_name="vault-shim"}'>
+```
+
+**If Grafana is empty / Mimir has no metrics / Tempo has no traces:** something is broken in the trace path. Document what you found here, then add it as a catch in `JUDGEMENT.md` Section 2.
+
+---
+
+## Negative tests (the brief promises these)
+
+### `kubectl exec` into debug pod, `curl 1.1.1.1:443` must fail
+
+```text
+<paste output of `make validate-negative-tests` first half>
+```
+
+### `kubectl apply --dry-run=server` a manifest violating Kyverno — must be denied
+
+```text
+<paste output of `make validate-negative-tests` second half>
+```
+
+---
+
+## Per-CI-gate evidence
+
+For each gate, paste either a workflow-run-link OR an act-local output OR a manual command output. We will spot-check claims.
+
+### Gate 1 — lint (`golangci-lint`)
+
+`<evidence>`
+
+### Gate 2 — unit (`go test`)
+
+`<evidence>`
+
+### Gate 3 — SAST (`semgrep`)
+
+`<evidence>`
+
+### Gate 4 — SCA (`govulncheck`)
+
+`<evidence — paste at least the vuln IDs flagged>`
+
+### Gate 5 — secret scan (`gitleaks`)
+
+`<evidence — and your interpretation of whether the gate caught everything it should have>`
+
+### Gate 6 — IaC scan (`checkov`)
+
+`<evidence>`
+
+### Gate 7 — container scan + SBOM (`trivy`)
+
+`<evidence>`
+
+### Gate 8 — image signing (`cosign`)
+
+`<evidence>`
+
+### Gate 9 — policy gate (`kyverno admission dry-run`)
+
+`<evidence>`
+
+---
+
+## SECURITY.md cross-check
+
+Pick 3 rows from `SECURITY.md` and confirm the enforcement file actually does what the row claims. Document any drift in `JUDGEMENT.md` Section 2.
+
+### Row `<#>`
+
+`<which row, what the enforcement file says, whether they match>`
+
+### Row `<#>`
+
+`<same>`
+
+### Row `<#>`
+
+`<same>`
+
+---
+
+## Bring-up issues (if any)
+
+Anything that didn't work on your machine. The starter is expected to build on recent macOS Docker Desktop; Linux Docker may need workarounds for `host.docker.internal`.
+
+`<your answer or "none">`

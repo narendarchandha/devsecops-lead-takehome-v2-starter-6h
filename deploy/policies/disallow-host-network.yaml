@@ -1,0 +1,26 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-host-network
+  annotations:
+    policies.kyverno.io/category: Pod Security Standards (Baseline)
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: check-host-network
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [vault-shim]
+      validate:
+        message: "hostNetwork is not allowed on vault-shim Pods."
+        deny:
+          conditions:
+            all:
+              - key: "{{ request.object.spec.hostNetwork || `false` }}"
+                operator: Equals
+                value: true

@@ -1,0 +1,39 @@
+# Minimal single-binary Tempo config for local take-home use.
+# Filesystem storage. No multi-tenancy.
+
+server:
+  http_listen_port: 3200
+  log_level: warn
+
+distributor:
+  receivers:
+    # We accept OTLP on internal-only ports here. The OTel Collector forwards
+    # to Tempo via its own otlp exporter (see otel-collector-config.yaml) which
+    # targets tempo:4320 (gRPC). Candidates' services should send OTLP to the
+    # Collector on 4317/4318, NOT directly to Tempo.
+    otlp:
+      protocols:
+        http:
+          endpoint: 0.0.0.0:4319
+        grpc:
+          endpoint: 0.0.0.0:4320
+
+ingester:
+  trace_idle_period: 10s
+  max_block_bytes: 1_000_000
+  max_block_duration: 5m
+
+compactor:
+  compaction:
+    block_retention: 24h          # 1-day retention is fine for take-home
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /var/tempo/blocks
+    wal:
+      path: /var/tempo/wal
+
+usage_report:
+  reporting_enabled: false

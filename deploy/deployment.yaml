@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault-shim
+  namespace: vault-shim
+  labels:
+    app.kubernetes.io/name: vault-shim
+    app.kubernetes.io/component: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vault-shim
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vault-shim
+        app.kubernetes.io/component: api
+    spec:
+      serviceAccountName: vault-shim
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: vault-shim
+          # Image is pinned by digest in the deploy.yml workflow. For local
+          # dev `make deploy` uses the `:dev` tag built by `make cluster-up`.
+          image: vault-shim:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: SIGNING_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vault-shim-runtime
+                  key: signing_key
+            - name: BOOTSTRAP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: vault-shim-runtime
+                  key: bootstrap_token
+            # OTel — sends to the host's docker-compose Collector. The
+            # NetworkPolicy egress rule for this lives in
+            # `networkpolicy.yaml` rule (5). On Docker Desktop,
+            # `host.docker.internal` resolves to a host loopback IP in
+            # the 192.168.65.0/24 range.
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://host.docker.internal:4318"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
+            - name: OTEL_SERVICE_NAME
+              value: "vault-shim"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            timeoutSeconds: 2
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: cache
+              mountPath: /home/nonroot/.cache
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 16Mi
+        - name: cache
+          emptyDir:
+            sizeLimit: 16Mi
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: vault-shim

@@ -1,0 +1,5 @@
+# The candidate adds `red.json` (and any other dashboards) to this folder.
+# Anything placed here is auto-loaded by Grafana via the dashboards provider in
+# ../provisioning/dashboards/dashboards.yaml.
+#
+# See observability/README.md for the dashboard authoring flow.

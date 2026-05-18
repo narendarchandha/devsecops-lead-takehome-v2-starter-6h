@@ -1,0 +1,12 @@
+# vault-shim default configuration.
+# Loaded from ./config.yaml unless overridden by --config or VAULT_SHIM_CONFIG.
+
+addr: ":8080"
+log_level: "debug"
+
+# HMAC signing key used to verify bearer JWTs.
+signing_key: "8f3b2a4c1d6e9f0a7b8c5d2e3f4a1b6c"
+
+# Bootstrap token accepted directly as a Bearer credential (used by the
+# operator CLI before the JWT issuer is online).
+bootstrap_token: "vshim_b9d4c8e1a2f7345698abcdef01234567"

@@ -1,0 +1,14 @@
+# Documented exceptions to security gates.
+#
+# Schema:
+#   - id: short slug
+#     gate: gate name (lint | sast | sca | secret-scan | iac | container | image-signing | policy)
+#     finding: the exact rule/finding ID (e.g. CVE-2023-1234)
+#     accepted_by: github handle of approver
+#     accepted_at: ISO date
+#     expires_at: ISO date (max 90 days from accepted_at)
+#     rationale: one paragraph
+#
+# Empty by default. Add a row only when remediation is genuinely deferred.
+
+exceptions: []

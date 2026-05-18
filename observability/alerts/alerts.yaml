@@ -1,0 +1,40 @@
+groups:
+  - name: vault-shim
+    interval: 30s
+    rules:
+      - alert: VaultShimHigh5xxRatio
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{service_name="vault-shim",http_status_code=~"5.."}[5m]))
+            / sum(rate(http_server_request_duration_seconds_count{service_name="vault-shim"}[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: page
+          team: platform
+        annotations:
+          summary: "vault-shim 5xx ratio > 5% for 5m"
+          description: "vault-shim is returning 5xx for more than 5% of requests over a 5-minute window."
+          runbook_url: "https://github.com/${REPO}/blob/main/RUNBOOK.md#scenario-5xx-spike"
+
+      - alert: VaultShimFailedAuthSpike
+        expr: |
+          sum(rate(vault_shim_auth_failed_total[1m])) > 5
+        for: 2m
+        labels:
+          severity: page
+          team: platform
+        annotations:
+          summary: "vault-shim auth failures > 5/sec for 2m"
+          description: "Sustained auth failures on vault-shim. Likely brute force or credential rotation in flight."
+          runbook_url: "https://github.com/${REPO}/blob/main/RUNBOOK.md#scenario-auth-spike"
+
+      - alert: VaultShimNoTracesReceived
+        expr: |
+          sum(rate(otelcol_receiver_accepted_spans_total{service="vault-shim"}[5m])) == 0
+        for: 10m
+        labels:
+          severity: warn
+          team: platform
+        annotations:
+          summary: "OTel Collector received no spans from vault-shim for 10m"
+          description: "Either vault-shim isn't sending OTLP, the NetworkPolicy is blocking egress, or the Collector isn't reachable. Check both ends."
+          runbook_url: "https://github.com/${REPO}/blob/main/RUNBOOK.md#scenario-no-traces"

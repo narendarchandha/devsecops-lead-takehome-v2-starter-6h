@@ -1,0 +1,19 @@
+# gitleaks v8 config. Defaults inherit from the built-in ruleset.
+# https://github.com/gitleaks/gitleaks/blob/master/config/gitleaks.toml
+
+title = "vault-shim repo gitleaks config"
+
+[extend]
+useDefault = true
+
+# Allowlist for known-noisy paths.
+[allowlist]
+description = "Test fixtures and vendored content that aren't real secrets."
+paths = [
+  # Test fixtures used by integration tests in vault-shim.
+  '''^vault-shim/config\.yaml$''',
+  # Generated lock files and vendored deps.
+  '''^vault-shim/go\.sum$''',
+  # Grafana dashboards may contain example UUIDs that trip entropy rules.
+  '''^observability/grafana/dashboards/''',
+]

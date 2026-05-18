@@ -1,0 +1,33 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: vault-shim
+
+# Single-node kind cluster with port mappings for ingress-nginx.
+# Port 80 on the host → port 80 on the node → ingress-nginx on the cluster.
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        node-labels: "ingress-ready=true"
+  extraPortMappings:
+  - containerPort: 80
+    hostPort: 80
+    protocol: TCP
+  - containerPort: 443
+    hostPort: 443
+    protocol: TCP
+
+# Networking — default kindnet CNI is disabled in favour of Calico.
+# kindnet enforces NetworkPolicy unevenly: pod->cluster-internal works,
+# pod->host-loopback (192.168.65.x on Docker Desktop) is silently exempt.
+# Calico enforces uniformly, which matches production EKS behaviour and is
+# what the RUNBOOK / VALIDATION expects. The Makefile's `cluster-up` target
+# installs Calico immediately after kind brings the node up.
+networking:
+  apiServerAddress: "127.0.0.1"
+  apiServerPort: 6443
+  disableDefaultCNI: true
+  podSubnet: "192.168.0.0/16"

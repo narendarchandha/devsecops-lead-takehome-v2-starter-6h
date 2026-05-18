@@ -1,0 +1,43 @@
+# Semgrep custom + curated rules for vault-shim and deploy/.
+#
+# The Semgrep registry is also queried in CI via the `r2c-security-audit`
+# ruleset (configured in `.github/workflows/ci.yml`). The rules below are
+# the project-local additions.
+
+rules:
+  # Forbid plain k8s `Secret` manifests in deploy/. All secrets must flow
+  # via External Secrets Operator or Sealed Secrets.
+  - id: deploy-no-plain-k8s-secret
+    languages: [yaml]
+    severity: ERROR
+    message: |
+      Plain `kind: Secret` manifest detected in deploy/. Use ExternalSecret
+      (or SealedSecret) so the value isn't committed to git.
+    paths:
+      include:
+        - "deploy/**/*.yaml"
+        - "deploy/**/*.yml"
+      exclude:
+        # ExternalSecret targets a Secret object — it's allowed because the
+        # value isn't in git, it's resolved by the operator at runtime.
+        - "deploy/externalsecret.yaml"
+    pattern: |
+      kind: Secret
+
+  # Encourage K8s manifests to use immutable container image digests, not
+  # tags. Tag mutability defeats the cosign image-signing chain of trust.
+  - id: deploy-image-by-digest
+    languages: [yaml]
+    severity: WARNING
+    message: |
+      Container image referenced by tag. Production deploys should reference
+      by digest (`image: foo@sha256:…`) so the signed-image attestation
+      stays bound to the image bytes.
+    paths:
+      include:
+        - "deploy/deployment.yaml"
+    patterns:
+      - pattern: 'image: $IMG'
+      - metavariable-regex:
+          metavariable: $IMG
+          regex: '^[^@]+:[^@]+$'

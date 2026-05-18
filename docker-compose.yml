@@ -1,0 +1,22 @@
+# vault-shim local dev (no Kubernetes, no LGTM).
+#
+# For the full stack (kind cluster + LGTM observability), run:
+#   make observability-up   # bring up Loki/Tempo/Mimir/Grafana/Promtail/OTel
+#   make cluster-up         # create kind cluster + ingress-nginx + Kyverno + ESO
+#   make deploy             # apply deploy/ manifests
+#
+# This compose file is for inner-loop iteration on vault-shim alone.
+services:
+  vault-shim:
+    build:
+      context: ./vault-shim
+      dockerfile: Dockerfile
+    container_name: vault-shim
+    ports:
+      - "8080:8080"
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://host.docker.internal:4318"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
+      OTEL_SERVICE_NAME: "vault-shim"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
