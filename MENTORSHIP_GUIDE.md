@@ -18,34 +18,55 @@ Most sections of this guide ship complete. The "Top five operating-discipline le
 
 ---
 
-## Top five operating-discipline lessons (in your voice) `<YOU FILL>`
+## Top five operating-discipline lessons (in your voice)
 
-This is the section a junior reads and thinks "OK, that person has done this for real". It's also the section that's hardest to generate convincingly. Write five lessons that you've actually internalized through doing this work.
+### Lesson 1 — Validate the failure path of every gate, not just the pass path.
 
-Each lesson:
-- A one-sentence statement of the lesson.
-- A short story (1 paragraph) of when you learned it. Real beats hypothetical.
-- The check you do today to honour it.
+**Statement:** A gate that can't fail is not a gate — it's a comfort blanket.
 
-### Lesson 1
+**The story:** Early in my career I inherited a SAST pipeline that had been "passing" for months. One day I noticed the scan artefact was always the same size regardless of what code changed. The scanner was running, producing output, and the CI step was green. What nobody had checked was whether a finding would actually block the build. The step used `|| true` to handle scanner exit codes "safely." The gate was fully wired and completely useless. I've seen the same pattern on govulncheck, dependency-check, and even custom audit scripts — all passing, all silent. Now I validate gates by deliberately triggering their failure path: inject a known-bad dep, commit a fake secret, apply a violating manifest. If the gate doesn't fire, the gate is broken, full stop.
 
-`<YOUR LESSON>`
+**The check today:** Before closing any ticket that adds or modifies a CI gate, run a negative test: introduce the violation the gate is supposed to catch, confirm the build fails, revert. Document the negative test result in the PR description.
 
-### Lesson 2
+---
 
-`<YOUR LESSON>`
+### Lesson 2 — `set +e` in a CI gate step is almost always a security defect, not a convenience.
 
-### Lesson 3
+**Statement:** If you need to suppress errors in a security check, what you actually need is a better check — not error suppression.
 
-`<YOUR LESSON>`
+**The story:** I've seen `set +e` appear in CI scripts dozens of times, almost always with a comment that says "we'll handle this properly later." Later never comes. The `set +e` pattern in the govulncheck step in this repo is a textbook example: the comment says "fail on HIGH-severity findings"; the code exits 0 unconditionally. The dangerous part is not the bug itself — it's that the developer who wrote it and the reviewers who approved it all read the comment and assumed the intent was implemented. I now read security-related CI scripts the same way I read IAM policies: the declared intent is irrelevant; only the effective behavior matters. What does `$?` actually hold at exit? Is there a `|| true` anywhere in the chain?
 
-### Lesson 4
+**The check today:** When reviewing any CI step that runs a security tool, I grep for `set +e`, `|| true`, `|| echo`, `; true`, and `exit 0` — any pattern that could swallow a non-zero exit. If I find one, I block the PR until the step is fixed or the suppression is explicitly justified with a comment explaining what other gate compensates.
 
-`<YOUR LESSON>`
+---
 
-### Lesson 5
+### Lesson 3 — Fail-closed controls must actually fail closed — test by triggering the failure.
 
-`<YOUR LESSON>`
+**Statement:** "Fail-closed" is a claim, not a property — it becomes true only after you've observed the failure.
+
+**The story:** The cosign verify step in this repo had `|| echo "warn: cosign verify failed — continuing for non-prod"` appended to it. SECURITY.md row 7 described this as a fail-closed control. The SECURITY.md was not wrong by accident — someone wrote it believing the step would fail closed, because that was the intent. The disconnect between the written security posture and the actual code is the most dangerous gap in a security program, because it means your controls matrix is fiction. I learned this the hard way when a "mandatory code signing check" in a deploy pipeline turned out to have a `--force` flag available to any developer. Nobody used it maliciously; it just meant the control existed only on paper. Now when I review a security control, I ask: "what does an attacker need to do to make this step succeed when it should fail?" If the answer is "add `|| true`" or "pass `--skip-verify`" or "set an env var," the control is not fail-closed.
+
+**The check today:** For every fail-closed control in a SECURITY.md or controls matrix, I trace from the control description to the actual enforcement file. I look for fallbacks, overrides, environment-variable bypasses, and conditional `if:` blocks. I add a one-line comment to the enforcement file explaining why the fallback is absent.
+
+---
+
+### Lesson 4 — Logs are a secret store you didn't intend to build.
+
+**Statement:** Every field you log is a field an attacker (or an overprivileged colleague) can read — treat log fields with the same access control mindset you apply to the data store.
+
+**The story:** The `value=%q` log line in vault-shim is a perfect example of how this happens in practice: the developer who wrote it was debugging, wanted to confirm the store was working, and left the field in. It's not malicious — it's the "log everything while developing, prune before prod" habit that nobody remembers to honour at ship time. The blast radius is significant: Loki has 30-day retention, is readable by every developer with dashboard access, and may be forwarded to a centralized log archive that has its own retention policy. A single `log.Printf("value=%q")` in one endpoint turns your secret store into a 30-day plaintext leak. I've seen this pattern with database query results, API response bodies, and JWT payloads — all logged for "debugging convenience" and all readable after the fact.
+
+**The check today:** In code review, I scan every new or changed `log.Printf`/`slog.Info`/`logger.With` call for field names that resemble sensitive data: `value`, `password`, `token`, `secret`, `key`, `credential`. I also have a custom semgrep rule that flags this pattern at CI time. The rule is not perfect — it will miss a field named `v` — but it catches the obvious cases and creates a forcing function for reviewers to think about what they're logging.
+
+---
+
+### Lesson 5 — Read allowlists as carefully as rulesets — exclusions are where the risk hides.
+
+**Statement:** A broad allowlist is a security control that runs backwards: it reduces the attack surface of your detection, not of your system.
+
+**The story:** The gitleaks allowlist in this repo exempted `vault-shim/config.yaml` entirely. The comment said "test fixtures" — which is a legitimate reason to exempt a file. The problem is that config.yaml also contained the real production credentials (`signing_key`, `bootstrap_token`). The exclusion was added at some point during development when the scanner was generating noise, and nobody went back to narrow it. The result: gitleaks ran on every commit, produced output, and the two highest-severity findings in the repo were invisible to it. I've seen the same pattern in WAF rules ("allowlist this IP range because it's our load balancer" — then the IP range is too broad), in IAM policies ("allow s3:* on arn:aws:s3:::dev-*" — then a prod bucket gets named `dev-backups-prod`), and in Semgrep rulesets ("ignore this path" — then the path pattern matches more files than intended). Allowlists and exclusions deserve a separate review pass, because they often accumulate silently over time and nobody challenges them.
+
+**The check today:** When reviewing any security tool configuration that contains an allowlist, exclusion list, or suppression rule, I read each entry and ask: (1) Is this still valid? (2) Is it as narrow as it can be? (3) Does it exclude things it shouldn't? I add an expiry comment to any time-bound exclusion (`# expires 2026-06-01: false positive in test fixture, remove after test refactor`) so it doesn't silently persist forever.
 
 ---
 
