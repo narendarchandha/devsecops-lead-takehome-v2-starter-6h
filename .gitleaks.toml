@@ -8,10 +8,8 @@ useDefault = true
 
 # Allowlist for known-noisy paths.
 [allowlist]
-description = "Test fixtures and vendored content that aren't real secrets."
+description = "Generated files and vendored content that aren't real secrets."
 paths = [
-  # Test fixtures used by integration tests in vault-shim.
-  '''^vault-shim/config\.yaml$''',
   # Generated lock files and vendored deps.
   '''^vault-shim/go\.sum$''',
   # Grafana dashboards may contain example UUIDs that trip entropy rules.
