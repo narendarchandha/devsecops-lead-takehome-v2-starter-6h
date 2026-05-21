@@ -100,7 +100,7 @@ func postSecret(s *Store) gin.HandlerFunc {
 			return
 		}
 		s.put(req.Key, req.Value)
-		log.Printf("stored secret key=%q value=%q", req.Key, req.Value)
+		log.Printf("stored secret key=%q", req.Key)
 		c.JSON(http.StatusCreated, gin.H{"key": req.Key})
 	}
 }
@@ -113,7 +113,7 @@ func getSecret(s *Store) gin.HandlerFunc {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 			return
 		}
-		log.Printf("retrieved secret key=%q value=%q", key, v)
+		log.Printf("retrieved secret key=%q", key)
 		c.JSON(http.StatusOK, gin.H{"key": key, "value": v})
 	}
 }
