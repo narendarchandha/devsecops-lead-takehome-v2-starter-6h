@@ -71,15 +71,14 @@ jobs:
       - name: Run govulncheck
         working-directory: vault-shim
         run: |
-          set +e
-          govulncheck -json ./... > ../govulncheck.json
-          echo "exitcode=$?"
-          # Fail the build only on HIGH-severity called-path findings.
-          # govulncheck non-zero exit means findings; we surface them in
-          # the artefact for review. Treat HIGH severity as fail in a
-          # follow-on step once an `.security/exceptions.yaml` policy
-          # is in place to triage accepted findings.
-          test -s ../govulncheck.json
+          govulncheck -json ./... > ../govulncheck.json || true
+          # Fail the build on any HIGH or CRITICAL called-path finding.
+          if jq -e '[.[] | select(.osv.severity[]?.type == "CVSS_V3" and (.osv.severity[]?.score | tonumber) >= 7.0)] | length > 0' ../govulncheck.json > /dev/null 2>&1; then
+            echo "govulncheck: HIGH/CRITICAL called-path vulnerabilities found — failing build"
+            jq '[.[] | select(.osv) | {id: .osv.id, summary: .osv.summary}]' ../govulncheck.json
+            exit 1
+          fi
+          echo "govulncheck: no HIGH/CRITICAL called-path findings"
       - uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
         with: { name: govulncheck-report, path: govulncheck.json, if-no-files-found: warn }
 
